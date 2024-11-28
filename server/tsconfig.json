@@ -1,0 +1,9 @@
+{
+    "compilerOptions": {
+      "module": "NodeNext",
+      "moduleResolution": "NodeNext",
+      "typeRoots": ["./node_modules/@types", "./@types"]
+      // other options...
+    }
+  }
+  
