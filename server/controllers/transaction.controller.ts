@@ -7,9 +7,14 @@ import TransactionModel from "../models/transaction.model";
 
 export const createTransaction = CatchAsyncError(async(req: Request, res: Response, next: NextFunction)=>{
     try {
-        const {type, amount, description} = req.body;
+        const {type, amount, description, orderId} = req.body;
         if(type && amount && description){
-            const transaction = await TransactionModel.create({type, amount, description});
+            let transaction;
+            if(type === "sale"){
+            transaction = await TransactionModel.create({type, amount, description, orderId});
+
+            }
+             transaction = await TransactionModel.create({type, amount, description});
             if (!transaction){
                 return next(new ErrorHandler("Error happend while creating transaction",500))
             }

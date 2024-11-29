@@ -6,6 +6,11 @@ import ProductModel, { IProduct, ProductSchema } from "../models/product.model";
 import OrderModel, { IOrder } from "../models/order.model";
 import CustomerModel from "../models/customer.model";
 import calculateBill from "../utils/calculateBill";
+import puppeteer from "puppeteer";
+import path from "path";
+import fs from "fs";
+import { invoiceHTML } from "../PDFtemplates/invoiceHTML";
+import TransactionModel from "../models/transaction.model";
 interface CustomerOrder {
     product: IProduct;
     qty: number;
@@ -182,8 +187,14 @@ export const addOrder = CatchAsyncError(async(req: Request, res: Response, next:
         if(!customer){
             return next(new ErrorHandler("Customer not found",400));
         }
+        if(customer.orders.includes(orderId)){
+            return next(new ErrorHandler("cannot place a pre-existing order",400));
+        }
         const cart:any = order.cart;
         let total = calculateBill(cart);
+        order.billPayment = billPayment;
+        order.total = total;
+
 
         // const calculateBill = (cart: any) =>{
         //     for(const item of cart){
@@ -194,13 +205,39 @@ export const addOrder = CatchAsyncError(async(req: Request, res: Response, next:
         // for(const item of cart){
         //     total+=item.qty*(item.product.price);
         // }
-        order.billPayment = billPayment
-        await order.save();
+         // Generate a readable timestamp
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    const hours = String(now.getHours()).padStart(2, "0");
+    const minutes = String(now.getMinutes()).padStart(2, "0");
+    const seconds = String(now.getSeconds()).padStart(2, "0");
+    const invoiceName = `${year}-${month}-${day}_${hours}-${minutes}-${seconds}_invoice.pdf`;
+
+    // Ensure the directory exists
+    const billsDir = path.join(__dirname, "..", "public", "bills");
+    if (!fs.existsSync(billsDir)) {
+        fs.mkdirSync(billsDir, { recursive: true });
+    }
+
+    const pdfPath = path.join(billsDir, invoiceName);
+
+    // Launch Puppeteer
+    const browser = await puppeteer.launch({
+        headless: true,
+        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+
+    
 
 
         if(billPayment>total){
             return next(new ErrorHandler("Payment should not exceed the total bill",400))
         }
+
+        
+        
 
         const udhar = total-billPayment;
         if(udhar>0){
@@ -209,8 +246,39 @@ export const addOrder = CatchAsyncError(async(req: Request, res: Response, next:
         
         customer.orders.push(orderId);
         
+        const billData = {order, customer, billPayment}
+        let generatedMTML;
+        try {
+            (async()=>{
+                generatedMTML= await invoiceHTML(billData)
+            })()
+        } catch (error) {
+            return next(new ErrorHandler("Error generating bill HTML",500))
+            
+        }
+
+
+        try {
+            const page = await browser.newPage();
+            await page.setContent(generatedMTML); // Set the HTML content
+            await page.pdf({ path: pdfPath, format: "A4" }); // Save PDF to the specified path
+            await browser.close();
+    
+            console.log(`PDF generated successfully at ${pdfPath}`);
+        } catch (err) {
+            await browser.close();
+            next(new ErrorHandler("Error generating PDF", 500));
+        }
+order.bill = pdfPath;
+
         await customer.save();
 
+        await order.save();
+
+        let transaction:any;
+        if(billPayment>0){
+            transaction = await TransactionModel.create({type:"sale",amount: billPayment, description:`${customer.name} ${year}-${month}-${day}`, orderId})
+        }
         res.status(200).json({
             success: true,
             message: "Placed order",

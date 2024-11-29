@@ -15,7 +15,7 @@ export const OrderSchema = new Schema<IOrder>({
     total:{type: Number},
     billPayment:{type: Number, default: 0},
     bill:{type: String,}
-});
+},{timestamps: true});
 
 // Create the model
 const OrderModel: Model<IOrder> = mongoose.model<IOrder>("Order", OrderSchema);

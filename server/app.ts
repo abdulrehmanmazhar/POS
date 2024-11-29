@@ -9,6 +9,7 @@ import customerRouter from "./routes/customer.route"
 import productRouter from "./routes/product.route"
 import orderRouter from "./routes/order.route"
 import transactionRouter from "./routes/transaction.route"
+import { PDFgenerator } from "./utils/puppeteer";
 
 
 
@@ -45,12 +46,7 @@ app.use("/api/v1",transactionRouter);
 
 
 
-app.get("/test", (req : Request, res : Response, next : NextFunction)=>{
-    res.status(200).json({
-        success: true,
-        message: "API is working"
-    })
-})
+app.get("/test", PDFgenerator)
 
 // unknown route 
 
