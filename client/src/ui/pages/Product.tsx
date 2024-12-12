@@ -1,17 +1,40 @@
-import React, { useState, ChangeEvent, FormEvent } from 'react';
+import React, { useState, ChangeEvent, FormEvent, useEffect } from 'react';
+import axiosInstance from '../utils/axiosInstance';
+import { toast } from 'react-toastify';
 
 interface Product {
   name: string;
   category: string;
   price: number;
+  stockQty: number;
 }
 
 const Product: React.FC = () => {
   const [productName, setProductName] = useState<string>('');
   const [price, setPrice] = useState<string>('');
+  const [stockQty, setStockQty] = useState<string>('');
   const [categories, setCategories] = useState<string[]>(['Electronics', 'Clothing', 'Books']);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [newCategory, setNewCategory] = useState<string>('');
+  const [refreshCategories, setRefreshCategories] = useState<boolean>(false); // State to trigger useEffect
+
+  const syncCategory = () => {
+    axiosInstance
+      .get('/get-products')
+      .then((response) => {
+        const uniqueCategories: string[] = Array.from(
+          new Set(response.data.products.map((product: Product) => product.category))
+        );
+        setCategories(uniqueCategories);
+      })
+      .catch((error) => {
+        console.error('Error fetching categories:', error);
+      });
+  };
+
+  useEffect(() => {
+    syncCategory();
+  }, [refreshCategories]); // Trigger only on page load or refreshCategories change
 
   const handleAddCategory = (): void => {
     if (newCategory && !categories.includes(newCategory)) {
@@ -22,7 +45,7 @@ const Product: React.FC = () => {
 
   const handleFormSubmit = (e: FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
-    if (!productName || !selectedCategory || !price) {
+    if (!productName || !selectedCategory || !price || !stockQty) {
       alert('Please fill in all fields');
       return;
     }
@@ -31,14 +54,24 @@ const Product: React.FC = () => {
       name: productName,
       category: selectedCategory,
       price: parseFloat(price),
+      stockQty: parseInt(stockQty, 10),
     };
 
-    console.log(newProduct);
+    axiosInstance
+      .post('/add-product', newProduct)
+      .then(() => {
+        toast.success('Product added successfully');
+        setRefreshCategories((prev) => !prev); // Trigger category refresh
+      })
+      .catch((error) => {
+        toast.error(error.response?.data?.message || 'An error occurred');
+      });
 
     // Clear form inputs
     setProductName('');
     setSelectedCategory('');
     setPrice('');
+    setStockQty('');
   };
 
   return (
@@ -66,7 +99,9 @@ const Product: React.FC = () => {
             onChange={(e: ChangeEvent<HTMLSelectElement>) => setSelectedCategory(e.target.value)}
             style={{ width: '100%', padding: '8px', marginBottom: '8px' }}
           >
-            <option value="" disabled>Select a category</option>
+            <option value="" disabled>
+              Select a category
+            </option>
             {categories.map((cat, index) => (
               <option key={index} value={cat}>
                 {cat}
@@ -93,6 +128,19 @@ const Product: React.FC = () => {
             value={price}
             onChange={(e: ChangeEvent<HTMLInputElement>) => setPrice(e.target.value)}
             placeholder="Enter product price"
+            required
+            style={{ width: '100%', padding: '8px' }}
+          />
+        </div>
+
+        {/* Stock Quantity */}
+        <div style={{ marginBottom: '10px' }}>
+          <label>Stock Quantity:</label>
+          <input
+            type="number"
+            value={stockQty}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setStockQty(e.target.value)}
+            placeholder="Enter stock quantity"
             required
             style={{ width: '100%', padding: '8px' }}
           />

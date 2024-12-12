@@ -337,3 +337,26 @@ export const deleteOrder = CatchAsyncError(async(req: Request, res: Response, ne
         
     }
 })
+
+export const getOrder = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { id: orderId } = req.params;
+
+        // Find the order by ID
+        const order = await OrderModel.findById(orderId);
+
+        if (!order) {
+            // If the order is not found, return an error
+            return next(new ErrorHandler("Order not found", 404));
+        }
+
+        // If order is found, send it in the response
+        res.status(200).json({
+            success: true,
+            order,
+        });
+    } catch (error) {
+        // Handle unexpected errors
+        return next(new ErrorHandler(error.message, 500));
+    }
+});
