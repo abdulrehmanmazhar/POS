@@ -1,152 +1,239 @@
-import  { useState } from 'react';
-
-type Customer = {
-  id: number;
-  name: string;
-  address: string;
-  contact: string;
-  amount: number;
-  billLink: string;
-};
+import React, { useEffect, useState } from 'react';
+import axiosInstance from "../utils/axiosInstance";
+import { toast } from "react-toastify";
 
 const Credits = () => {
-  const [customers, setCustomers] = useState<Customer[]>([
-    { id: 1, name: 'Ali Khan', address: '123 Street, Lahore', contact: '0321-1234567', amount: 5000, billLink: 'https://example.com/bill/1' },
-    { id: 2, name: 'Sara Ahmed', address: '456 Avenue, Karachi', contact: '0332-7654321', amount: 3000, billLink: 'https://example.com/bill/2' },
-    { id: 3, name: 'Usman Tariq', address: '789 Road, Islamabad', contact: '0343-9876543', amount: 7000, billLink: 'https://example.com/bill/3' },
-  ]);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [paymentAmount, setPaymentAmount] = useState<number | ''>('');
+  const [customers, setCustomers] = useState([]);
+  const [credits, setCredits] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterDate, setFilterDate] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [currentCredit, setCurrentCredit] = useState(null);
+  const [updatedUdhar, setUpdatedUdhar] = useState(0);
 
-  const handleManageClick = (customer: Customer) => {
-    setSelectedCustomer(customer);
-    setPaymentAmount('');
+  const fetchCustomers = async () => {
+    try {
+      const { data } = await axiosInstance.get("/get-customers");
+      setCustomers(data.customers || []);
+    } catch (error) {
+      console.error("Error fetching customers:", error);
+      toast.error("Failed to fetch customers.");
+    }
   };
 
-  const handlePayment = () => {
-    if (paymentAmount === '' || paymentAmount <= 0) {
-      alert('Please enter a valid payment amount!');
-      return;
+  const populateCredits = async () => {
+    try {
+      const creditArray = [];
+
+      for (const customer of customers) {
+        if (customer.udhar > 0 && customer.orders.length > 0) {
+          const mostRecentOrderId = customer.orders[customer.orders.length - 1];
+          // console.log(customer._id)
+          try {
+            const { data: orderData } = await axiosInstance.get(`/get-order/${mostRecentOrderId}`);
+            creditArray.push({
+              id: customer._id,
+              name: customer.name,
+              address: customer.address,
+              contact: customer.contact,
+              udhar: customer.udhar,
+              billLink: orderData.order.bill,
+            });
+          } catch (error) {
+            console.error(`Error fetching order for customer ${customer._id}:`, error);
+          }
+        }
+      }
+      setCredits(creditArray);
+    } catch (error) {
+      console.error("Error populating credits:", error);
+      toast.error("Failed to populate credits.");
     }
-    if (selectedCustomer) {
-      const updatedCustomers = customers.map((customer) =>
-        customer.id === selectedCustomer.id
-          ? { ...customer, amount: customer.amount - Number(paymentAmount) }
-          : customer
+  };
+
+  useEffect(() => {
+    fetchCustomers();
+  }, [showModal]);
+
+  useEffect(() => {
+    if (customers.length > 0) {
+      populateCredits();
+    }
+  }, [customers]);
+
+  const handleSearchChange = (e) => setSearchQuery(e.target.value);
+
+  const handleDateChange = (e) => setFilterDate(e.target.value);
+
+  const handleManageClick = (credit) => {
+    setCurrentCredit(credit);
+    setUpdatedUdhar(credit.udhar);
+    setShowModal(true);
+  };
+
+  const handleUpdateUdhar = async () => {
+    if (!currentCredit) return;
+    // console.log(currentCredit)
+  
+    try {
+      const { data } = await axiosInstance.put(`/returnUdhar/${currentCredit.id}`, {
+        returnUdhar: updatedUdhar,
+      });
+  
+      // Display success toast message
+      toast.success(data.message);
+      // console.error(data);
+  
+      setShowModal(false);
+    } catch (error) {
+      console.error("Error updating udhar:", error);
+  
+      // Display error toast message
+      toast.error(
+        error
       );
-      setCustomers(updatedCustomers);
-      setSelectedCustomer(null);
-      setPaymentAmount('');
     }
   };
+  
+
+  const filteredCredits = credits.filter((credit) => {
+    let creditDate = '';
+
+    try {
+      const match = credit.billLink.match(/(\d{4}-\d{2}-\d{2})/);
+      creditDate = match ? match[1] : '';
+    } catch (error) {
+      console.error(`Invalid date in billLink for credit ID ${credit.id}:`, credit.billLink);
+    }
+
+    return (
+      credit.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+      (!filterDate || creditDate === filterDate)
+    );
+  });
 
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
-      {/* Heading */}
-      <h2 style={{ textAlign: 'center', marginBottom: '20px' }}>Udhar</h2>
+      <h2 style={{ textAlign: 'center', marginBottom: '20px' }}>Credits</h2>
 
-      {/* User Listing */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', marginBottom: '20px' }}>
+        <input
+          type="text"
+          placeholder="Search by name"
+          value={searchQuery}
+          onChange={handleSearchChange}
+          style={{ padding: '10px', flex: '2', border: '1px solid #ddd', borderRadius: '4px' }}
+        />
+        <input
+          type="date"
+          value={filterDate}
+          onChange={handleDateChange}
+          style={{ padding: '10px', flex: '1', border: '1px solid #ddd', borderRadius: '4px' }}
+        />
+      </div>
+
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr>
             <th>#</th>
             <th>Name</th>
             <th>Address</th>
             <th>Contact</th>
-            <th>Amount</th>
+            <th>Udhar</th>
             <th>Bill</th>
             <th>Manage</th>
           </tr>
         </thead>
         <tbody>
-          {customers
-            .filter((customer) => customer.amount > 0)
-            .map((customer, index) => (
-              <tr key={customer.id} style={{ borderBottom: '1px solid #ddd' }}>
-                <td>{index + 1}</td>
-                <td>{customer.name}</td>
-                <td>{customer.address}</td>
-                <td>{customer.contact}</td>
-                <td>${customer.amount}</td>
-                <td>
-                  <a href={customer.billLink} target="_blank" rel="noopener noreferrer">
-                    View Bill
-                  </a>
-                </td>
-                <td>
-                  <button
-                    onClick={() => handleManageClick(customer)}
-                    style={{
-                      padding: '5px 10px',
-                      backgroundColor: '#007bff',
-                      color: '#fff',
-                      border: 'none',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Manage
-                  </button>
-                </td>
-              </tr>
-            ))}
+          {filteredCredits.map((credit, index) => (
+            <tr key={credit.id} style={{ borderBottom: '1px solid #ddd' }}>
+              <td>{index + 1}</td>
+              <td>{credit.name}</td>
+              <td>{credit.address}</td>
+              <td>{credit.contact}</td>
+              <td>{credit.udhar}</td>
+              <td>
+                <a href={credit.billLink} target="_blank" rel="noopener noreferrer">
+                  View Bill
+                </a>
+              </td>
+              <td>
+                <button
+                  style={{
+                    padding: '5px 10px',
+                    backgroundColor: '#007bff',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => handleManageClick(credit)}
+                >
+                  Manage
+                </button>
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
 
-      {/* Manage Modal */}
-      {selectedCustomer && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            backgroundColor: '#fff',
+      {showModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <div style={{
+            background: '#fff',
             padding: '20px',
-            boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
             borderRadius: '8px',
-            width: '400px',
-          }}
-        >
-          <h3 style={{ marginBottom: '20px' }}>Manage Customer</h3>
-          <p><strong>Name:</strong> {selectedCustomer.name}</p>
-          <p><strong>Amount Owed:</strong> ${selectedCustomer.amount}</p>
-          <div style={{ marginBottom: '20px' }}>
-            <label>
-              Payment Amount:
-              <input
-                type="number"
-                value={paymentAmount}
-                onChange={(e) => setPaymentAmount(e.target.value !== '' ? Number(e.target.value) : '')}
-                style={{ marginLeft: '10px', padding: '5px', width: '100%' }}
-              />
-            </label>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <button
-              onClick={() => setSelectedCustomer(null)}
-              style={{
-                padding: '5px 10px',
-                backgroundColor: '#6c757d',
-                color: '#fff',
-                border: 'none',
-                cursor: 'pointer',
-                marginRight: '10px',
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handlePayment}
-              style={{
-                padding: '5px 10px',
-                backgroundColor: '#28a745',
-                color: '#fff',
-                border: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              Pay
-            </button>
+            width: '300px',
+            textAlign: 'center',
+          }}>
+            <h3>Update Udhar</h3>
+            <p>Current Udhar: {currentCredit.udhar}</p>
+            <input
+              type="number"
+              value={updatedUdhar}
+              onChange={(e) => setUpdatedUdhar(Number(e.target.value))}
+              style={{ padding: '10px', width: '100%', marginBottom: '10px' }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+              <button
+                onClick={() => setShowModal(false)}
+                style={{
+                  padding: '10px',
+                  backgroundColor: '#dc3545',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  flex: 1,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpdateUdhar}
+                style={{
+                  padding: '10px',
+                  backgroundColor: '#28a745',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  flex: 1,
+                }}
+              >
+                Pay
+              </button>
+            </div>
           </div>
         </div>
       )}

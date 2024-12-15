@@ -3,6 +3,7 @@ import express, { Request, Response, NextFunction } from "express";
 import ErrorHandler from "../utils/ErrorHandler";
 import { CatchAsyncError } from "../middleware/catchAsyncError";
 import CustomerModel from "../models/customer.model";
+import TransactionModel from "../models/transaction.model";
 
 
 interface IAddCustomer {
@@ -91,6 +92,58 @@ export const deleteCustomer = CatchAsyncError(async(req: Request, res: Response,
     })
     } catch (error) {
         return next(new ErrorHandler(error.message,500))
+        
+    }
+})
+export const getCustomerById = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { id } = req.params; // Extract the id from params
+
+        // Find the customer by ID
+        const customer = await CustomerModel.findById(id);
+
+        if (!customer) {
+            return next(new ErrorHandler("Customer not found", 404));
+        }
+
+        res.status(200).json({
+            success: true,
+            customer,
+        });
+    } catch (error) {
+        return next(new ErrorHandler(error.message, 500));
+    }
+});
+
+export const returnUdhar = CatchAsyncError(async(req: Request, res: Response, next: NextFunction)=>{
+    try {
+        const { id } = req.params; // Extract the id from params
+        const {returnUdhar} = req.body
+
+        // Find the customer by ID
+        const customer = await CustomerModel.findById(id);
+
+        if (!customer) {
+            return next(new ErrorHandler("Customer not found", 404));
+        }
+
+        if(returnUdhar> customer.udhar){
+            return next(new ErrorHandler("Cannot pay more than udhar amount",400))
+        }
+        const type="sale";
+        const transaction = await TransactionModel.create({type, amount: returnUdhar, description:`${customer.name}-${customer.address} paid from his udhar ${customer.udhar}`})
+        if(!transaction){
+            return next(new ErrorHandler("Couldn't make transaction",500))
+        }
+        customer.udhar = customer.udhar-returnUdhar;
+        await customer.save();
+        res.status(200).json({
+            success: true,
+            message: `Udhar is now ${customer.udhar} PKR`
+        })
+
+    } catch (error) {
+        return next(new ErrorHandler(error.message, 500));
         
     }
 })

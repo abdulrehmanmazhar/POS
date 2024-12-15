@@ -7,6 +7,7 @@ export interface IOrder extends Document{
     total: number;
     billPayment: number;
     bill: string;
+    createdAt: Date;
 };
 
 export const OrderSchema = new Schema<IOrder>({

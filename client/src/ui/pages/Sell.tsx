@@ -34,6 +34,8 @@ const Sell = () => {
 
   const [payment, setPayment] = useState<number>(0);
 
+  const [loading, setLoading] = useState<boolean>(false);
+
   useEffect(()=>{fetchCustomers(); fetchProducts()},[])
 
   const syncCart = async (order: any) =>{
@@ -129,19 +131,32 @@ const Sell = () => {
     }
   };
 
-  const addOrderHandler = async () =>{
-    if(!orderId){
-      return console.warn("no order found");
+  const addOrderHandler = async () => {
+    if (!orderId) {
+      return console.warn("No order found");
     }
+    setLoading(true);
     try {
-      await axiosInstance.post(`/add-order/${orderId}`,{billPayment: payment, customerId: selectedCustomer })
+      await axiosInstance.post(`/add-order/${orderId}`, {
+        billPayment: payment,
+        customerId: selectedCustomer,
+      });
       toast.success("Order done successfully.");
-      
+
+      // Reset all states to default
+      setSelectedCustomer('');
+      setCurrentProduct(null);
+      setQuantity(1);
+      setAddedItems([]);
+      setOrderId(undefined);
+      setPayment(0);
     } catch (error) {
       toast.error("Failed to place order.");
-      console.log(error)
+      console.error(error);
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
   const totalBill = addedItems.reduce((sum, item) => sum + item.product.price*item.qty, 0);
 
@@ -314,20 +329,7 @@ const Sell = () => {
             }}
             onClick={addOrderHandler}
           >
-            Generate Bill
-          </button>
-          <button
-            style={{
-              flex: 1,
-              backgroundColor: '#6c757d',
-              color: '#fff',
-              border: 'none',
-              padding: '10px',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
-          >
-            Cancel
+            {loading ? 'Processing...' : 'Generate Bill'}
           </button>
         </div>
       </div>

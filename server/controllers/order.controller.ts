@@ -241,7 +241,7 @@ export const addOrder = CatchAsyncError(async(req: Request, res: Response, next:
 
         const udhar = total-billPayment;
         if(udhar>0){
-            customer.udhar = udhar;
+            customer.udhar = customer.udhar?customer.udhar+udhar:0+udhar;
         }
         
         customer.orders.push(orderId);
@@ -354,6 +354,30 @@ export const getOrder = CatchAsyncError(async (req: Request, res: Response, next
         res.status(200).json({
             success: true,
             order,
+        });
+    } catch (error) {
+        // Handle unexpected errors
+        return next(new ErrorHandler(error.message, 500));
+    }
+});
+
+export const getAllOrders = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        // Retrieve all orders from the database
+        const orders = await OrderModel.find().select("-__v"); // Exclude __v field if unnecessary
+
+        if (!orders || orders.length === 0) {
+            // If no orders are found, return an error
+            return next(new ErrorHandler("No orders found", 404));
+        }
+
+        // Send the orders along with their creation dates in the response
+        res.status(200).json({
+            success: true,
+            orders: orders.map(order => ({
+                ...order.toObject(),
+                createdAt: order.createdAt // Ensure the createdAt field is included
+            })),
         });
     } catch (error) {
         // Handle unexpected errors

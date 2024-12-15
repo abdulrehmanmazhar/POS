@@ -1,23 +1,69 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import axiosInstance from "../utils/axiosInstance";
+import { toast } from "react-toastify";
 
 type Bill = {
-  id: number;
+  id: number; // Added id field
   name: string;
   address: string;
   contact: string;
-  billDate: string; // ISO format for simplicity
+  billDate: string; // ISO format
   billLink: string;
 };
 
 const Bills = () => {
-  const [bills, setBills] = useState<Bill[]>([
-    { id: 1, name: 'Ali Khan', address: '123 Street, Lahore', contact: '0321-1234567', billDate: '2024-12-01', billLink: 'https://example.com/bill/1' },
-    { id: 2, name: 'Sara Ahmed', address: '456 Avenue, Karachi', contact: '0332-7654321', billDate: '2024-11-30', billLink: 'https://example.com/bill/2' },
-    { id: 3, name: 'Usman Tariq', address: '789 Road, Islamabad', contact: '0343-9876543', billDate: '2024-12-02', billLink: 'https://example.com/bill/3' },
-  ]);
+  const [bills, setBills] = useState<Bill[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [filterDate, setFilterDate] = useState<string>('');
+  const [orders, setOrders] = useState<any[]>([]);
+
+  const fetchOrders = async () => {
+    try {
+      const { data } = await axiosInstance.get("/get-orders");
+      setOrders(data.orders || []);
+    } catch (error) {
+      console.error("Error fetching orders:", error);
+      toast.error("Failed to fetch orders.");
+    }
+  };
+
+  const billCreator = async () => {
+    try {
+      const billArray: Bill[] = [];
+      for (let order of orders) {
+        try {
+          const { data } = await axiosInstance.get(`/get-customer/${order.customerId}`);
+          const customerData = data.customer;
+          const bill: Bill = {
+            id: order.id, // Ensure 'id' is present in 'order'
+            name: customerData.name,
+            address: customerData.address,
+            contact: customerData.contact,
+            billDate: order.updatedAt,
+            billLink: order.bill,
+          };
+          billArray.push(bill);
+        } catch (error) {
+          console.error(`Error fetching customer data for order ${order.id}:`, error);
+        }
+      }
+      setBills(billArray);
+    } catch (error) {
+      console.error("Error creating bills:", error);
+      toast.error("Failed to create bills.");
+    }
+  };
+
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
+  useEffect(() => {
+    if (orders.length > 0) {
+      billCreator();
+    }
+  }, [orders]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
@@ -28,56 +74,41 @@ const Bills = () => {
   };
 
   const handleSortChange = () => {
+    const sortedBills = [...bills].sort((a, b) => {
+      return sortDirection === 'asc'
+        ? new Date(a.billDate).getTime() - new Date(b.billDate).getTime()
+        : new Date(b.billDate).getTime() - new Date(a.billDate).getTime();
+    });
     setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    setBills((prevBills) =>
-      [...prevBills].sort((a, b) =>
-        sortDirection === 'asc'
-          ? new Date(a.billDate).getTime() - new Date(b.billDate).getTime()
-          : new Date(b.billDate).getTime() - new Date(a.billDate).getTime()
-      )
-    );
+    setBills(sortedBills);
   };
 
-  const filteredBills = bills.filter((bill) =>
-    bill.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-    (!filterDate || bill.billDate === filterDate)
-  );
+  const filteredBills = bills.filter((bill) => {
+    const billDate = new Date(bill.billDate).toISOString().split('T')[0]; // Normalize billDate
+    return (
+      bill.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+      (!filterDate || billDate === filterDate)
+    );
+  });
 
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
-      {/* Heading */}
       <h2 style={{ textAlign: 'center', marginBottom: '20px' }}>Bills</h2>
 
-      {/* Search, Date, and Sort */}
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', marginBottom: '20px' }}>
-        {/* Search Bar */}
         <input
           type="text"
           placeholder="Search by name"
           value={searchQuery}
           onChange={handleSearchChange}
-          style={{
-            padding: '10px',
-            flex: '2',
-            border: '1px solid #ddd',
-            borderRadius: '4px',
-          }}
+          style={{ padding: '10px', flex: '2', border: '1px solid #ddd', borderRadius: '4px' }}
         />
-        
-        {/* Date Filter */}
         <input
           type="date"
           value={filterDate}
           onChange={handleDateChange}
-          style={{
-            padding: '10px',
-            flex: '1',
-            border: '1px solid #ddd',
-            borderRadius: '4px',
-          }}
+          style={{ padding: '10px', flex: '1', border: '1px solid #ddd', borderRadius: '4px' }}
         />
-        
-        {/* Sort Button */}
         <button
           onClick={handleSortChange}
           style={{
@@ -93,7 +124,6 @@ const Bills = () => {
         </button>
       </div>
 
-      {/* Bill Listing */}
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr>
@@ -115,7 +145,7 @@ const Bills = () => {
               <td>{new Date(bill.billDate).toLocaleDateString()}</td>
               <td>
                 <a href={bill.billLink} target="_blank" rel="noopener noreferrer">
-                  View Bill
+                   Bill Link
                 </a>
               </td>
             </tr>

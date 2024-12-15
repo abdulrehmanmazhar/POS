@@ -3,6 +3,7 @@ export const invoiceHTML = async (billData: any) => {
   const { name, address, contact, udhar } = customer;
   const { cart, total, payment } = order;
 
+  const credit = Number(udhar)-(Number(total)-Number(billPayment))
   // Generate table rows dynamically based on the cart
   const cartRows = await cart
     .map((item: any, index: number) => {
@@ -96,7 +97,7 @@ export const invoiceHTML = async (billData: any) => {
         <p><strong>Name:</strong> ${name}</p>
         <p><strong>Address:</strong> ${address}</p>
         <p><strong>Contact:</strong> ${contact}</p>
-        <p><strong>Last Dues:</strong> ${udhar}</p>
+        <p><strong>Previous Dues:</strong> ${credit} PKR</p>
       </div>
 
       <table class="table">
@@ -123,7 +124,8 @@ export const invoiceHTML = async (billData: any) => {
           </tr>
           <tr>
             <td colspan="4" class="total-row">Remaining:</td>
-            <td>${(total - billPayment)?.toFixed(2)}</td>
+            <td>${(total - billPayment + credit)?.toFixed(2)} PKR</td>
+
           </tr>
         </tfoot>
       </table>
