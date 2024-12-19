@@ -9,7 +9,9 @@ import customerRouter from "./routes/customer.route"
 import productRouter from "./routes/product.route"
 import orderRouter from "./routes/order.route"
 import transactionRouter from "./routes/transaction.route"
+import analyticsRouter from "./routes/analytics.route"
 import { PDFgenerator } from "./utils/puppeteer";
+import path from "path"
 
 
 
@@ -26,7 +28,8 @@ app.use(cookieParser());
 
 app.use(cors({
     // origin: process.env.NODE_ENV === 'production' ? process.env.ORIGINS : '*',
-    origin:['http://localhost:5173'],
+    // origin:['http://localhost:5173'],
+    origin:['http://localhost:8000'],
     credentials: true
 }))
 
@@ -38,10 +41,24 @@ app.use("/api/v1",customerRouter);
 app.use("/api/v1",productRouter);
 app.use("/api/v1",orderRouter);
 app.use("/api/v1",transactionRouter);
+app.use("/api/v1",analyticsRouter);
 
 
 
 
+// Route to serve specific bill files
+app.get('/api/v1/bills/:filename', (req, res) => {
+    const filename = req.params.filename; 
+    const filePath = path.join(__dirname, 'public/bills', filename);
+
+    // Serve the file
+    res.sendFile(filePath, (err) => {
+        if (err) {
+            console.error(err);
+            res.status(404).send('File not found');
+        }
+    });
+});
 
 
 

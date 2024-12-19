@@ -2,14 +2,15 @@ require("dotenv").config();
 import express, { Request, Response, NextFunction } from "express";
 import ErrorHandler from "../utils/ErrorHandler";
 import { CatchAsyncError } from "../middleware/catchAsyncError";
-
+import { History } from "../models/product.model";
 import ProductModel from "../models/product.model";
-
+import TransactionModel from "../models/transaction.model";
 export const addProduct = CatchAsyncError(async(req: Request, res: Response, next: NextFunction)=>{
     try {
-        const { name, category, price, stockQty } = req.body;
+        const { name, category, price, stockQty, totalBill, discount } = req.body;
         let inStock = false;
-        if(name && category && price && stockQty){   
+        // console.log(name, category, price, stockQty, totalBill, discount)
+        if(name && category && price && stockQty &&totalBill){   
             const product = await ProductModel.findOne({name, category});
             
             if(product){
@@ -18,7 +19,18 @@ export const addProduct = CatchAsyncError(async(req: Request, res: Response, nex
             if(stockQty>0){
                 inStock = true
             }
-            const createdProduct = await ProductModel.create({name, category, price, stockQty, inStock})
+            let purchasePrice = totalBill/stockQty;
+            let history = [];
+            let historyIndices : History = {
+                qty: stockQty,
+                totalBill: totalBill,
+                purchasePrice,
+                date: new Date(Date.now())
+            }
+            history.push(historyIndices);
+            const createdProduct = await ProductModel.create({name, category, price, stockQty, inStock, purchasePrice, discount, history})
+            await TransactionModel.create({type:"investment",amount: totalBill, description:`added new product ${name}(${category})`})
+
             res.status(200).json({
                 success: true,
                 createdProduct
@@ -98,6 +110,44 @@ export const deleteProduct = CatchAsyncError(async(req: Request, res: Response, 
         success: true,
         message:"Deleted the product successfully"
     })
+    } catch (error) {
+        return next(new ErrorHandler(error.message,500))
+        
+    }
+})
+
+export const restockProduct = CatchAsyncError(async(req: Request, res: Response, next: NextFunction)=>{
+    try {
+        const { price, stockQty, discount, totalBill } = req.body;
+        const {id} = req.params;
+        let inStock = false;
+        if(!(price && stockQty && totalBill)){
+            return next(new ErrorHandler("something is missing",400))
+        }
+        const targetProduct = await ProductModel.findById(id);
+        if(!targetProduct){
+            return next(new ErrorHandler("Target product not found",400))
+        }
+        if(stockQty>0){
+            inStock = true
+        }
+        let purchasePrice = totalBill/stockQty;
+        let history = targetProduct.history;
+        let historyIndices : History = {
+            qty: stockQty,
+            totalBill: totalBill,
+            purchasePrice,
+            date: new Date(Date.now())
+        }
+        history.push(historyIndices)
+        const data = {price, stockQty: targetProduct.stockQty+stockQty, discount, totalBill, purchasePrice, history};
+        const editedOne = await ProductModel.findByIdAndUpdate(id,{$set:data},{new: true})
+        await TransactionModel.create({type:"investment",amount: totalBill, description:`restocked the product ${targetProduct.name}(${targetProduct.category})`})
+
+        res.status(200).json({
+            success:true,
+            editedOne
+        })
     } catch (error) {
         return next(new ErrorHandler(error.message,500))
         

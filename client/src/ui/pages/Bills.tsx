@@ -1,15 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import axiosInstance from "../utils/axiosInstance";
 import { toast } from "react-toastify";
+import { baseURL } from '../utils/axiosInstance';
 
 type Bill = {
-  id: number; // Added id field
+  id: number;
   name: string;
   address: string;
   contact: string;
-  billDate: string; // ISO format
+  billDate: string;
   billLink: string;
 };
+
+const ITEMS_PER_PAGE = 15;
 
 const Bills = () => {
   const [bills, setBills] = useState<Bill[]>([]);
@@ -17,6 +20,7 @@ const Bills = () => {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [filterDate, setFilterDate] = useState<string>('');
   const [orders, setOrders] = useState<any[]>([]);
+  const [currentPage, setCurrentPage] = useState<number>(1);
 
   const fetchOrders = async () => {
     try {
@@ -36,7 +40,7 @@ const Bills = () => {
           const { data } = await axiosInstance.get(`/get-customer/${order.customerId}`);
           const customerData = data.customer;
           const bill: Bill = {
-            id: order.id, // Ensure 'id' is present in 'order'
+            id: order.id,
             name: customerData.name,
             address: customerData.address,
             contact: customerData.contact,
@@ -84,12 +88,30 @@ const Bills = () => {
   };
 
   const filteredBills = bills.filter((bill) => {
-    const billDate = new Date(bill.billDate).toISOString().split('T')[0]; // Normalize billDate
+    const billDate = new Date(bill.billDate).toISOString().split('T')[0];
     return (
       bill.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
       (!filterDate || billDate === filterDate)
     );
   });
+
+  const totalPages = Math.ceil(filteredBills.length / ITEMS_PER_PAGE);
+  const paginatedBills = filteredBills.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
 
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
@@ -136,22 +158,56 @@ const Bills = () => {
           </tr>
         </thead>
         <tbody>
-          {filteredBills.map((bill, index) => (
+          {paginatedBills.map((bill, index) => (
             <tr key={bill.id} style={{ borderBottom: '1px solid #ddd' }}>
-              <td>{index + 1}</td>
+              <td>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</td>
               <td>{bill.name}</td>
               <td>{bill.address}</td>
               <td>{bill.contact}</td>
               <td>{new Date(bill.billDate).toLocaleDateString()}</td>
               <td>
-                <a href={bill.billLink} target="_blank" rel="noopener noreferrer">
-                   Bill Link
+                <a href={`${baseURL}/bills/${bill.billLink}`} target="_blank" rel="noopener noreferrer">
+                  View Bill
                 </a>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
+        <button
+          onClick={handlePrevPage}
+          disabled={currentPage === 1}
+          style={{
+            padding: '10px 20px',
+            backgroundColor: currentPage === 1 ? '#ddd' : '#007bff',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+          }}
+        >
+          Prev
+        </button>
+        <span style={{ alignSelf: 'center' }}>
+          Page {currentPage} of {totalPages}
+        </span>
+        <button
+          onClick={handleNextPage}
+          disabled={currentPage === totalPages}
+          style={{
+            padding: '10px 20px',
+            backgroundColor: currentPage === totalPages ? '#ddd' : '#007bff',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+          }}
+        >
+          Next
+        </button>
+      </div>
     </div>
   );
 };

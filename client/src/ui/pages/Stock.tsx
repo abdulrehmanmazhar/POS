@@ -7,6 +7,7 @@ interface Product {
   name: string;
   category: string;
   price: number;
+  purchasePrice: number;
   stockQty: number;
 }
 
@@ -14,6 +15,10 @@ const Stock: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [viewInStock, setViewInStock] = useState<boolean>(true);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
   useEffect(() => {
     productSync();
@@ -42,7 +47,7 @@ const Stock: React.FC = () => {
         toast.success('Product edited successfully');
         productSync();
         setSelectedProduct(null);
-      } catch (error : any) {
+      } catch (error: any) {
         toast.error(error.response?.data?.message || 'Failed to edit product.');
       }
     }
@@ -55,7 +60,7 @@ const Stock: React.FC = () => {
         toast.success('Product deleted successfully');
         productSync();
         setSelectedProduct(null);
-      } catch (error : any) {
+      } catch (error: any) {
         toast.error(error.response?.data?.message || 'Failed to delete product.');
       }
     }
@@ -64,6 +69,17 @@ const Stock: React.FC = () => {
   const filteredProducts = products.filter(product =>
     viewInStock ? product.stockQty > 0 : product.stockQty === 0
   );
+
+  // Pagination logic
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentProducts = filteredProducts.slice(indexOfFirstItem, indexOfLastItem);
+
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
 
   const buttonStyle = (isActive: boolean) => ({
     padding: '10px 20px',
@@ -85,7 +101,7 @@ const Stock: React.FC = () => {
         <div style={{ flex: 1, margin: '10px', padding: '20px', border: '1px solid #ddd', textAlign: 'center' }}>
           <h4>Stock Value</h4>
           <p style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>
-            PKR {products.reduce((acc, product) => acc + product.price * product.stockQty, 0)}
+            PKR {products.reduce((acc, product) => acc + product.stockQty * product.purchasePrice, 0)}
           </p>
         </div>
         <div style={{ flex: 1, margin: '10px', padding: '20px', border: '1px solid #ddd', textAlign: 'center' }}>
@@ -120,7 +136,7 @@ const Stock: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredProducts.map(product => (
+              {currentProducts.map(product => (
                 <tr key={product._id} style={{ borderBottom: '1px solid #ddd' }}>
                   <td style={{ padding: '10px' }}>{product.name}</td>
                   <td style={{ padding: '10px' }}>{product.category}</td>
@@ -144,6 +160,33 @@ const Stock: React.FC = () => {
               ))}
             </tbody>
           </table>
+        </div>
+
+        {/* Pagination */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '20px' }}>
+          <button
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            style={buttonStyle(currentPage > 1)}
+          >
+            Previous
+          </button>
+          {Array.from({ length: totalPages }, (_, index) => index + 1).map(page => (
+            <button
+              key={page}
+              onClick={() => handlePageChange(page)}
+              style={buttonStyle(page === currentPage)}
+            >
+              {page}
+            </button>
+          ))}
+          <button
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            style={buttonStyle(currentPage < totalPages)}
+          >
+            Next
+          </button>
         </div>
       </div>
 
@@ -169,7 +212,7 @@ const Stock: React.FC = () => {
               <label>Product Name:</label>
               <input
                 type="text"
-                readOnly
+                onChange={e => handleEditChange('name', e.target.value)}
                 value={selectedProduct.name}
                 style={{ width: '100%', padding: '8px' }}
               />
@@ -178,6 +221,7 @@ const Stock: React.FC = () => {
               <label>Price:</label>
               <input
                 type="number"
+                readOnly
                 value={selectedProduct.price}
                 onChange={e => handleEditChange('price', parseFloat(e.target.value))}
                 style={{ width: '100%', padding: '8px' }}
@@ -187,6 +231,7 @@ const Stock: React.FC = () => {
               <label>Remaining Quantity:</label>
               <input
                 type="number"
+                readOnly
                 value={selectedProduct.stockQty}
                 onChange={e => handleEditChange('stockQty', parseInt(e.target.value, 10))}
                 style={{ width: '100%', padding: '8px' }}

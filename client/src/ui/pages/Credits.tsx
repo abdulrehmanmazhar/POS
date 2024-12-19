@@ -1,15 +1,37 @@
 import React, { useEffect, useState } from 'react';
 import axiosInstance from "../utils/axiosInstance";
 import { toast } from "react-toastify";
+import { baseURL } from '../utils/axiosInstance';
 
-const Credits = () => {
-  const [customers, setCustomers] = useState([]);
-  const [credits, setCredits] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterDate, setFilterDate] = useState('');
-  const [showModal, setShowModal] = useState(false);
-  const [currentCredit, setCurrentCredit] = useState(null);
-  const [updatedUdhar, setUpdatedUdhar] = useState(0);
+type Credit = {
+  id: string;
+  name: string;
+  address: string;
+  contact: string;
+  udhar: number;
+  billLink: string;
+};
+
+type Customer = {
+  _id: string;
+  name: string;
+  address: string;
+  contact: string;
+  udhar: number;
+  orders: string[];
+};
+
+const Credits: React.FC = () => {
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [credits, setCredits] = useState<Credit[]>([]);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [filterDate, setFilterDate] = useState<string>('');
+  const [showModal, setShowModal] = useState<boolean>(false);
+  const [currentCredit, setCurrentCredit] = useState<Credit | null>(null);
+  const [updatedUdhar, setUpdatedUdhar] = useState<number>(0);
+
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [itemsPerPage] = useState<number>(10);
 
   const fetchCustomers = async () => {
     try {
@@ -23,12 +45,11 @@ const Credits = () => {
 
   const populateCredits = async () => {
     try {
-      const creditArray = [];
+      const creditArray: Credit[] = [];
 
       for (const customer of customers) {
         if (customer.udhar > 0 && customer.orders.length > 0) {
           const mostRecentOrderId = customer.orders[customer.orders.length - 1];
-          // console.log(customer._id)
           try {
             const { data: orderData } = await axiosInstance.get(`/get-order/${mostRecentOrderId}`);
             creditArray.push({
@@ -61,11 +82,11 @@ const Credits = () => {
     }
   }, [customers]);
 
-  const handleSearchChange = (e) => setSearchQuery(e.target.value);
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value);
 
-  const handleDateChange = (e) => setFilterDate(e.target.value);
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => setFilterDate(e.target.value);
 
-  const handleManageClick = (credit) => {
+  const handleManageClick = (credit: Credit) => {
     setCurrentCredit(credit);
     setUpdatedUdhar(credit.udhar);
     setShowModal(true);
@@ -73,32 +94,21 @@ const Credits = () => {
 
   const handleUpdateUdhar = async () => {
     if (!currentCredit) return;
-    // console.log(currentCredit)
-  
     try {
       const { data } = await axiosInstance.put(`/returnUdhar/${currentCredit.id}`, {
         returnUdhar: updatedUdhar,
       });
-  
-      // Display success toast message
+
       toast.success(data.message);
-      // console.error(data);
-  
       setShowModal(false);
     } catch (error) {
       console.error("Error updating udhar:", error);
-  
-      // Display error toast message
-      toast.error(
-        error
-      );
+      toast.error("Failed to update udhar.");
     }
   };
-  
 
   const filteredCredits = credits.filter((credit) => {
     let creditDate = '';
-
     try {
       const match = credit.billLink.match(/(\d{4}-\d{2}-\d{2})/);
       creditDate = match ? match[1] : '';
@@ -111,6 +121,19 @@ const Credits = () => {
       (!filterDate || creditDate === filterDate)
     );
   });
+
+  const paginatedCredits = filteredCredits.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const totalPages = Math.ceil(filteredCredits.length / itemsPerPage);
+
+  const handlePageChange = (pageNumber: number) => {
+    if (pageNumber > 0 && pageNumber <= totalPages) {
+      setCurrentPage(pageNumber);
+    }
+  };
 
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
@@ -145,15 +168,15 @@ const Credits = () => {
           </tr>
         </thead>
         <tbody>
-          {filteredCredits.map((credit, index) => (
+          {paginatedCredits.map((credit, index) => (
             <tr key={credit.id} style={{ borderBottom: '1px solid #ddd' }}>
-              <td>{index + 1}</td>
+              <td>{(currentPage - 1) * itemsPerPage + index + 1}</td>
               <td>{credit.name}</td>
               <td>{credit.address}</td>
               <td>{credit.contact}</td>
               <td>{credit.udhar}</td>
               <td>
-                <a href={credit.billLink} target="_blank" rel="noopener noreferrer">
+                <a href={`${baseURL}/bills/${credit.billLink}`} target="_blank" rel="noopener noreferrer">
                   View Bill
                 </a>
               </td>
@@ -177,6 +200,40 @@ const Credits = () => {
         </tbody>
       </table>
 
+      <div style={{ marginTop: '20px', textAlign: 'center' }}>
+        <button
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          style={{
+            padding: '10px',
+            marginRight: '10px',
+            backgroundColor: currentPage === 1 ? '#ccc' : '#007bff',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+          }}
+        >
+          Prev
+        </button>
+        <span>{`Page ${currentPage} of ${totalPages}`}</span>
+        <button
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          style={{
+            padding: '10px',
+            marginLeft: '10px',
+            backgroundColor: currentPage === totalPages ? '#ccc' : '#007bff',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+          }}
+        >
+          Next
+        </button>
+      </div>
+
       {showModal && (
         <div style={{
           position: 'fixed',
@@ -197,7 +254,7 @@ const Credits = () => {
             textAlign: 'center',
           }}>
             <h3>Update Udhar</h3>
-            <p>Current Udhar: {currentCredit.udhar}</p>
+            <p>Current Udhar: {currentCredit?.udhar}</p>
             <input
               type="number"
               value={updatedUdhar}

@@ -269,7 +269,7 @@ export const addOrder = CatchAsyncError(async(req: Request, res: Response, next:
             await browser.close();
             next(new ErrorHandler("Error generating PDF", 500));
         }
-order.bill = pdfPath;
+        order.bill = invoiceName;
 
         await customer.save();
 
