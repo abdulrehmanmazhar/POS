@@ -1,5 +1,4 @@
-// App.tsx
-import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
+import { HashRouter as Router, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import Product from "./pages/Product";
 import Stock from "./pages/Stock";
