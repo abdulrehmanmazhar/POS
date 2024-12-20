@@ -13,38 +13,24 @@ import analyticsRouter from "./routes/analytics.route"
 import { PDFgenerator } from "./utils/puppeteer";
 import path from "path"
 
-
-
-
 // body parser
-
-app.use(express.json({limit: "50kb"}));
+app.use(express.json({ limit: "50kb" }));
 
 // cookie parser
-
 app.use(cookieParser());
 
 // cors
-
 app.use(cors({
-    // origin: process.env.NODE_ENV === 'production' ? process.env.ORIGINS : '*',
-    origin:"*",
-    // origin:['http://localhost:8000'],
-    credentials: true
-}))
+    origin: "*", // Allow all origins
+    credentials: true // Allow cookies and credentials
+}));
 
-
-
-
-app.use("/api/v1",userRouter);
-app.use("/api/v1",customerRouter);
-app.use("/api/v1",productRouter);
-app.use("/api/v1",orderRouter);
-app.use("/api/v1",transactionRouter);
-app.use("/api/v1",analyticsRouter);
-
-
-
+app.use("/api/v1", userRouter);
+app.use("/api/v1", customerRouter);
+app.use("/api/v1", productRouter);
+app.use("/api/v1", orderRouter);
+app.use("/api/v1", transactionRouter);
+app.use("/api/v1", analyticsRouter);
 
 // Route to serve specific bill files
 app.get('/api/v1/bills/:filename', (req, res) => {
@@ -60,17 +46,13 @@ app.get('/api/v1/bills/:filename', (req, res) => {
     });
 });
 
-
-
-
-app.get("/test", PDFgenerator)
+app.get("/test", PDFgenerator);
 
 // unknown route 
-
-app.all("*", (req : Request, res : Response, next : NextFunction)=>{
+app.all("*", (req: Request, res: Response, next: NextFunction) => {
     const err = new Error(`Can't find ${req.originalUrl} on this server`) as any;
     err.statusCode = 404;
     next(err);
-})
+});
 
 app.use(errorMiddleware);
