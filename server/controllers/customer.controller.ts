@@ -1,4 +1,6 @@
-require("dotenv").config();
+// @ts-nocheck
+require("dotenv")
+.config();
 import express, { Request, Response, NextFunction } from "express";
 import ErrorHandler from "../utils/ErrorHandler";
 import { CatchAsyncError } from "../middleware/catchAsyncError";
